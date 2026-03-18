@@ -1,0 +1,14 @@
+{
+    "idf.currentSetup": "C:\\Users\\centr\\esp\\v5.3\\esp-idf",
+
+    // ESP32-S3 chip target — this is what the extension passes as -DIDF_TARGET to cmake
+    "idf.adapterTargetName": "esp32s3",
+
+    // COM9 = native USB-CDC port (faster flash, no external USB-UART chip needed)
+    // COM8 = UART serial port (use if COM9 is unavailable)
+    "idf.portWin": "COM9",
+
+    "idf.openOcdConfigs": [
+        "board/esp32s3-builtin.cfg"
+    ]
+}
