@@ -115,24 +115,44 @@ static void on_ble_write(const uint8_t *data, size_t len)
 static void uart_rx_task(void *arg)
 {
     uint8_t buf[BLE_CHUNK];
+    int     pending_n = 0;   // bytes in buf waiting for a successful nus_notify
 
     ESP_LOGI(TAG, "UART→BLE task started");
 
     for (;;) {
-        // Block up to 20 ms waiting for data; non-zero timeout keeps CPU low
-        int n = uart_read_bytes(UART_PORT, buf, sizeof(buf), pdMS_TO_TICKS(20));
-        if (n <= 0) continue;
+        // Only read new data once the previous chunk has been sent.
+        //
+        // Backpressure mechanism: when nus_notify() fails (NimBLE mbuf pool
+        // exhausted) we keep pending_n > 0 and do NOT call uart_read_bytes
+        // again.  Leaving data in the UART driver ring buffer causes it to
+        // fill; once full the hardware FIFO can no longer be drained by the
+        // driver, the FIFO reaches the RTS threshold (FC_THRESH = 122/128
+        // bytes) and hardware RTS asserts, pausing the sender.  The BLE
+        // stack runs on core 0 and continues draining its tx queue; once an
+        // mbuf is freed the next retry succeeds and normal flow resumes.
+        if (pending_n == 0) {
+            int n = uart_read_bytes(UART_PORT, buf, sizeof(buf),
+                                    pdMS_TO_TICKS(20));
+            if (n <= 0) continue;
+            pending_n = n;
+            hex_dump("UART→BLE", buf, pending_n);
+        }
 
         if (!nus_is_connected()) {
-            // Drain received bytes silently if no BLE client is connected
+            pending_n = 0;   // discard while no client connected
             continue;
         }
 
-        hex_dump("UART→BLE", buf, n);
-
-        int rc = nus_notify(buf, n);
+        int rc = nus_notify(buf, pending_n);
         if (rc == 0) {
-            bytes_from_uart += n;
+            bytes_from_uart += pending_n;
+            pending_n = 0;
+        } else {
+            // Notify failed — hold buf, stop draining the ring buffer.
+            // Yield to let the BLE host task (core 0) progress and free mbufs.
+            ESP_LOGD(TAG, "BLE backpressure: mbuf alloc failed, holding %d B",
+                     pending_n);
+            vTaskDelay(pdMS_TO_TICKS(2));
         }
     }
 }
