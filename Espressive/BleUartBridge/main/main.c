@@ -79,6 +79,8 @@ static volatile bool          nimble_log_verbose  = false;
 static volatile unsigned long bytes_to_uart       = 0;
 static volatile unsigned long bytes_from_uart     = 0;
 static volatile unsigned long bytes_dropped_tx    = 0;  // BLE→UART queue-full drops
+static volatile unsigned long nomem_retries_total = 0;  // cumulative NUS_ERR_NOMEM retries
+static volatile unsigned long nomem_last_ms       = 0;  // duration of last NOMEM episode
 
 // ── UART TX queue (BLE → UART direction) ─────────────────────────────────────
 // on_ble_write() runs on the NimBLE host task (core 0).  Calling uart_write_bytes()
@@ -272,17 +274,26 @@ static void uart_rx_task(void *arg)
 
         int rc = nus_notify(buf, pending_n);
         if (rc == 0) {
+            if (retry_count > 0) {
+                // Log recovery once here — console has had time to drain during
+                // the vTaskDelay calls, so this single write is safe.
+                nomem_last_ms = (unsigned long)retry_count * 2;
+                ESP_LOGW(TAG, "UART→BLE: mbuf pool recovered after %lu ms", nomem_last_ms);
+            }
             bytes_from_uart += pending_n;
             pending_n   = 0;
             retry_count = 0;
         } else if (rc == NUS_ERR_NOMEM) {
             // mbuf pool temporarily exhausted — hold buf, yield so the BLE host
             // task (core 0) can drain its TX queue and free mbufs.
+            //
+            // NO ESP_LOG* calls in this hot loop. When hex dump is active,
+            // on_ble_write() floods the UART0 console faster than 115200 baud
+            // can drain it. uart_tx_char() then busy-waits on the full FIFO
+            // without yielding, which starves IDLE and triggers the task WDT.
+            // Counters are reported safely by the 's' status command instead.
             retry_count++;
-            if (retry_count % 250 == 0) {   // warn every ~500 ms
-                ESP_LOGW(TAG, "UART→BLE: mbuf pool exhausted for %d ms, holding %d B",
-                         retry_count * 2, pending_n);
-            }
+            nomem_retries_total++;
             vTaskDelay(pdMS_TO_TICKS(2));
         } else {
             // NUS_ERR_CONN: connection gone or fatal send error.
@@ -341,6 +352,7 @@ static void print_status(void)
     ESP_LOGI(TAG, " →UART      : %lu bytes", bytes_to_uart);
     ESP_LOGI(TAG, " ←UART      : %lu bytes", bytes_from_uart);
     ESP_LOGI(TAG, " TX dropped : %lu bytes  (BLE→UART queue-full)", bytes_dropped_tx);
+    ESP_LOGI(TAG, " NOMEM retry: %lu total  (last episode: %lu ms)", nomem_retries_total, nomem_last_ms);
     ESP_LOGI(TAG, " UART hwBuf : %u bytes", (unsigned)hw_buf);
     ESP_LOGI(TAG, " TX q depth : %u / %d",
              (unsigned)(TX_Q_DEPTH - uxQueueSpacesAvailable(s_uart_tx_q)), TX_Q_DEPTH);

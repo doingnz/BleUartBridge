@@ -186,6 +186,26 @@ is full (3 bytes flags + 18 bytes UUID128 = 21 bytes, leaving only 10 bytes free
 (512 − 3), but 128 bytes keeps per-notification latency low and avoids congestion
 when the client is slow to consume. Increase if throughput must be maximised.
 
+### Hex dump and task watchdog (WDT) interaction
+
+**Do not run hex dump during sustained high-speed stress tests.** When hex dump
+is on, `on_ble_write()` (NimBLE host task, core 0) calls `ESP_LOGI` for every
+incoming BLE write. At full throughput this floods the UART0 console faster than
+115200 baud can drain it.
+
+`uart_tx_char()` — the low-level console write primitive — **busy-waits** on the
+hardware TX FIFO when it is full. It does not yield to the scheduler. If
+`uart_rx_task` (core 1) calls any `ESP_LOG*` while the FIFO is saturated, it
+sticks in that busy-wait, never reaching `vTaskDelay()`, starving IDLE1, and
+triggering the task watchdog.
+
+**Fix applied:** all `ESP_LOG*` calls were removed from the `NUS_ERR_NOMEM`
+retry hot-loop in `uart_rx_task`. The loop only calls `vTaskDelay(2ms)`, which
+always yields. Counters (`nomem_retries_total`, `nomem_last_ms`) accumulate
+silently and are reported by the `s` status command. A single recovery log is
+emitted when `nus_notify()` first succeeds again — at that point the console has
+had time to drain during the preceding `vTaskDelay` calls.
+
 ### NimBLE mbuf pool
 
 `CONFIG_BT_NIMBLE_MSYS_1_BLOCK_COUNT=24` (up from the default 12).
