@@ -8,3 +8,8 @@ CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
 # ── Console ───────────────────────────────────────────────────────────────────
 # Classic ESP32 has no native USB — console via UART0 (CH340/CP2102 USB-UART chip)
 CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+# 921600 baud keeps hex dump output ahead of BLE write traffic (128 B chunk →
+# ~480 chars output → ~5 ms at 921600 vs ~42 ms at 115200; BLE writes arrive
+# every ~20 ms, so 115200 causes FIFO saturation and uart_tx_char busy-waits).
+# idf.py monitor reads this value automatically — no extra flag needed.
+CONFIG_ESP_CONSOLE_UART_BAUDRATE=921600
