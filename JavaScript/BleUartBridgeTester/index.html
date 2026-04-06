@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BLE UART Bridge Tester</title>
+    <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<h1>BLE UART Bridge Tester</h1>
+
+<!-- ── Connection section ──────────────────────────────────────────────────── -->
+<div class="connect-grid">
+
+    <!-- BLE -->
+    <div class="card">
+        <div class="card-header">Bluetooth LE</div>
+        <div class="status-row">
+            <span class="dot disconnected" id="ble-dot"></span>
+            <span id="ble-status">Not connected</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button class="btn-primary"  id="btn-ble-connect">Connect BLE</button>
+            <button class="btn-outline"  id="btn-ble-disconnect" hidden>Disconnect</button>
+        </div>
+        <p class="hint" style="margin-top:6px;">Nordic NUS (6E400001…) — BP+ Bridge</p>
+    </div>
+
+    <!-- Serial Port -->
+    <div class="card">
+        <div class="card-header">Serial Port</div>
+
+        <div class="config-row">
+            <label>Baud</label>
+            <select id="sel-baud">
+                <option>9600</option>
+                <option>19200</option>
+                <option>38400</option>
+                <option>57600</option>
+                <option selected>115200</option>
+                <option>230400</option>
+                <option>460800</option>
+            </select>
+            <label>Data</label>
+            <select id="sel-data" style="width:52px;">
+                <option>7</option>
+                <option selected>8</option>
+            </select>
+            <label>Parity</label>
+            <select id="sel-parity" style="width:68px;">
+                <option value="none" selected>None</option>
+                <option value="even">Even</option>
+                <option value="odd">Odd</option>
+            </select>
+            <label>Stop</label>
+            <select id="sel-stop" style="width:52px;">
+                <option selected>1</option>
+                <option>1.5</option>
+                <option>2</option>
+            </select>
+            <label>Flow ctrl</label>
+            <input type="checkbox" id="chk-flow" checked title="RTS/CTS hardware flow control">
+        </div>
+
+        <div class="status-row">
+            <span class="dot disconnected" id="serial-dot"></span>
+            <span id="serial-status">Not connected</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <button class="btn-primary" id="btn-serial-connect">Connect Serial</button>
+            <button class="btn-outline" id="btn-serial-disconnect" hidden>Disconnect</button>
+        </div>
+        <p class="hint" id="serial-api-hint" style="margin-top:6px;">
+            Desktop Chrome: WebSerial &nbsp;|&nbsp; Android Chrome: WebUSB + PL2303 adapter
+        </p>
+    </div>
+
+</div><!-- connect-grid -->
+
+<!-- ── Test control bar ────────────────────────────────────────────────────── -->
+<div class="test-bar">
+    <span class="dot disconnected" id="connected-dot"></span>
+    <span id="connected-status" style="font-weight:600;">Not connected</span>
+    <div class="spacer"></div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);">
+        <input type="checkbox" id="chk-stop-on-error" checked>
+        Stop on error
+    </label>
+    <button class="btn-danger"    id="btn-stop-all">Stop All</button>
+    <button class="btn-secondary" id="btn-clear-stats">Clear Stats</button>
+</div>
+
+<!-- ── Test cards ───────────────────────────────────────────────────────────── -->
+<div class="tests-grid">
+
+    <!-- COM → BLE -->
+    <div class="test-card primary" id="card-com-ble">
+        <div class="test-head">
+            <div class="test-title">
+                <span class="dot idle" id="com-ble-running-dot"></span>
+                COM&nbsp;→&nbsp;BLE Stress Test
+                <span class="spinner" id="com-ble-spinner"></span>
+            </div>
+            <span class="elapsed" id="com-ble-elapsed">00:00:00</span>
+        </div>
+
+        <div class="btn-row">
+            <button class="btn-primary" id="btn-com-ble-start" disabled>▶ Start</button>
+            <button class="btn-danger"  id="btn-com-ble-stop"  disabled>■ Stop</button>
+        </div>
+
+        <div class="stats-grid">
+            <span class="stat-label">Sent:</span>
+            <span class="stat-value" id="com-ble-sent">0</span>
+            <span class="stat-label">Received:</span>
+            <span class="stat-value" id="com-ble-recv">0</span>
+
+            <span class="stat-label">Errors:</span>
+            <span class="stat-value error" id="com-ble-errors">0</span>
+            <span class="stat-label">Speed:</span>
+            <span class="stat-value" id="com-ble-bps">0 B/s</span>
+
+            <span class="stat-label">Lat avg:</span>
+            <span class="stat-value" id="com-ble-lat-avg">—</span>
+            <span class="stat-label">Lat min:</span>
+            <span class="stat-value" id="com-ble-lat-min">—</span>
+
+            <span class="stat-label">Lat max:</span>
+            <span class="stat-value" id="com-ble-lat-max">—</span>
+        </div>
+
+        <hr>
+
+        <!-- COM→BLE simulated Rx delay -->
+        <div class="delay-row">
+            <input type="checkbox" id="chk-com-ble-delay" title="Simulate a busy BLE receiver">
+            <label for="chk-com-ble-delay" style="color:var(--primary);font-weight:500;">COM→BLE Rx delay</label>
+            <span style="font-size:12px;color:var(--text-muted);">0</span>
+            <input type="range" id="sld-com-ble-delay" min="0" max="300" value="150" disabled>
+            <span class="delay-val" id="lbl-com-ble-delay">150 ms</span>
+        </div>
+
+        <!-- Error dump (hidden until an error is captured) -->
+        <div class="error-panel" id="com-ble-error" hidden>
+            <div class="error-type" id="com-ble-error-type"></div>
+            <div class="error-cols">
+                <div class="error-col">
+                    <div class="panel-label">Expected</div>
+                    <pre class="hex-dump" id="com-ble-error-expected"></pre>
+                </div>
+                <div class="error-divider"></div>
+                <div class="error-col">
+                    <div class="panel-label err">Received</div>
+                    <pre class="hex-dump" id="com-ble-error-received"></pre>
+                </div>
+            </div>
+        </div>
+    </div><!-- COM→BLE card -->
+
+    <!-- BLE → COM -->
+    <div class="test-card secondary" id="card-ble-com">
+        <div class="test-head">
+            <div class="test-title">
+                <span class="dot idle" id="ble-com-running-dot"></span>
+                BLE&nbsp;→&nbsp;COM Stress Test
+                <span class="spinner" id="ble-com-spinner"></span>
+            </div>
+            <span class="elapsed" id="ble-com-elapsed">00:00:00</span>
+        </div>
+
+        <div class="btn-row">
+            <button class="btn-secondary" id="btn-ble-com-start" disabled>▶ Start</button>
+            <button class="btn-danger"    id="btn-ble-com-stop"  disabled>■ Stop</button>
+        </div>
+
+        <div class="stats-grid">
+            <span class="stat-label">Sent:</span>
+            <span class="stat-value" id="ble-com-sent">0</span>
+            <span class="stat-label">Received:</span>
+            <span class="stat-value" id="ble-com-recv">0</span>
+
+            <span class="stat-label">Errors:</span>
+            <span class="stat-value error" id="ble-com-errors">0</span>
+            <span class="stat-label">Speed:</span>
+            <span class="stat-value" id="ble-com-bps">0 B/s</span>
+
+            <span class="stat-label">Lat avg:</span>
+            <span class="stat-value" id="ble-com-lat-avg">—</span>
+            <span class="stat-label">Lat min:</span>
+            <span class="stat-value" id="ble-com-lat-min">—</span>
+
+            <span class="stat-label">Lat max:</span>
+            <span class="stat-value" id="ble-com-lat-max">—</span>
+        </div>
+
+        <hr>
+
+        <!-- BLE→COM simulated Rx delay -->
+        <div class="delay-row">
+            <input type="checkbox" id="chk-ble-com-delay" title="Simulate a busy serial receiver">
+            <label for="chk-ble-com-delay" style="color:var(--secondary);font-weight:500;">BLE→COM Rx delay</label>
+            <span style="font-size:12px;color:var(--text-muted);">0</span>
+            <input type="range" id="sld-ble-com-delay" min="0" max="300" value="150" disabled>
+            <span class="delay-val" id="lbl-ble-com-delay">150 ms</span>
+        </div>
+
+        <!-- Error dump -->
+        <div class="error-panel" id="ble-com-error" hidden>
+            <div class="error-type" id="ble-com-error-type"></div>
+            <div class="error-cols">
+                <div class="error-col">
+                    <div class="panel-label">Expected</div>
+                    <pre class="hex-dump" id="ble-com-error-expected"></pre>
+                </div>
+                <div class="error-divider"></div>
+                <div class="error-col">
+                    <div class="panel-label err">Received</div>
+                    <pre class="hex-dump" id="ble-com-error-received"></pre>
+                </div>
+            </div>
+        </div>
+    </div><!-- BLE→COM card -->
+
+</div><!-- tests-grid -->
+
+<!-- ── Packet format info ───────────────────────────────────────────────────── -->
+<div class="packet-info">
+    <p>Packet: [seq:4 LE][len:2 LE][payload:8–107][crc8:1][pad:1]</p>
+    <p>Payload len = (seq % 100) + 8 &nbsp;·&nbsp; payload[i] = (seq + i) &amp; 0xFF</p>
+    <p>CRC: CRC-8/SMBUS (poly=0x07) over seq+len+payload</p>
+</div>
+
+<script src="js/crc8-smbus.js"></script>
+<script src="js/packet.js"></script>
+<script src="js/ble-nus.js"></script>
+<script src="js/serial-port.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

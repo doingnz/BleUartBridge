@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:vm="clr-namespace:BleUartBridgeTester.ViewModels"
+             x:Class="BleUartBridgeTester.Pages.ManualPage"
+             Title="Manual"
+             BackgroundColor="{StaticResource PageBackground}">
+
+    <ContentPage.Resources>
+        <toolkit:InvertedBoolConverter x:Key="InvertBool" />
+        <toolkit:BoolToObjectConverter x:Key="BoolToConnectedColor"
+            TrueObject="{StaticResource ConnectedColor}"
+            FalseObject="{StaticResource DisconnectedColor}" />
+        <toolkit:BoolToObjectConverter x:Key="BoolToConnectedText"
+            TrueObject="Connected"
+            FalseObject="Not connected" />
+    </ContentPage.Resources>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="12">
+
+            <!-- Status + Stop on Error -->
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                <HorizontalStackLayout Grid.Column="0" Spacing="6" VerticalOptions="Center">
+                    <BoxView WidthRequest="10" HeightRequest="10" CornerRadius="5"
+                             BackgroundColor="{Binding IsConnected,
+                                 Converter={StaticResource BoolToConnectedColor}}"
+                             VerticalOptions="Center" />
+                    <Label Text="{Binding IsConnected,
+                               Converter={StaticResource BoolToConnectedText}}"
+                           TextColor="{Binding IsConnected,
+                               Converter={StaticResource BoolToConnectedColor}}"
+                           VerticalOptions="Center" FontAttributes="Bold" />
+                </HorizontalStackLayout>
+                <Label Grid.Column="1" Text="Stop on error:"
+                       VerticalOptions="Center"
+                       TextColor="{StaticResource TextSecondary}" />
+                <Switch Grid.Column="2" IsToggled="{Binding StopOnError}"
+                        VerticalOptions="Center" />
+            </Grid>
+
+            <BoxView HeightRequest="1" Color="{StaticResource BorderColor}" />
+
+            <!-- ── COM → BLE ── -->
+            <Frame Style="{StaticResource CardFrame}" BorderColor="{StaticResource Primary}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="COM → BLE" Style="{StaticResource SectionHeader}"
+                           TextColor="{StaticResource Primary}" />
+
+                    <HorizontalStackLayout Spacing="8">
+                        <Entry Placeholder="Type text and press Send"
+                               Text="{Binding ComSendText}"
+                               ReturnCommand="{Binding SendComCommand}"
+                               HorizontalOptions="FillAndExpand"
+                               IsEnabled="{Binding IsConnected}" />
+                        <Button Text="Send"
+                                Command="{Binding SendComCommand}"
+                                Style="{StaticResource PrimaryButton}"
+                                IsEnabled="{Binding IsConnected}"
+                                WidthRequest="72" />
+                    </HorizontalStackLayout>
+
+                    <Label Text="{Binding ComToBleMatchStatus}"
+                           TextColor="{Binding ComToBleMatchColor}"
+                           FontAttributes="Bold" FontSize="12" />
+
+                    <!-- Side-by-side hex dump -->
+                    <Grid ColumnDefinitions="*,1,*" ColumnSpacing="0" HeightRequest="180">
+                        <ScrollView Grid.Column="0">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="Sent" FontAttributes="Bold" FontSize="11"
+                                       TextColor="{StaticResource TextSecondary}" />
+                                <Label Text="{Binding ComToBleSentHex}"
+                                       Style="{StaticResource HexDump}" />
+                            </VerticalStackLayout>
+                        </ScrollView>
+                        <BoxView Grid.Column="1" Color="{StaticResource BorderColor}" />
+                        <ScrollView Grid.Column="2">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="Received (BLE)" FontAttributes="Bold" FontSize="11"
+                                       TextColor="{StaticResource TextSecondary}" />
+                                <Label Text="{Binding ComToBleReceivedHex}"
+                                       Style="{StaticResource HexDump}" />
+                            </VerticalStackLayout>
+                        </ScrollView>
+                    </Grid>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- ── BLE → COM ── -->
+            <Frame Style="{StaticResource CardFrame}" BorderColor="{StaticResource Secondary}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="BLE → COM" Style="{StaticResource SectionHeader}"
+                           TextColor="{StaticResource Secondary}" />
+
+                    <HorizontalStackLayout Spacing="8">
+                        <Entry Placeholder="Type text and press Send"
+                               Text="{Binding BleSendText}"
+                               ReturnCommand="{Binding SendBleCommand}"
+                               HorizontalOptions="FillAndExpand"
+                               IsEnabled="{Binding IsConnected}" />
+                        <Button Text="Send"
+                                Command="{Binding SendBleCommand}"
+                                Style="{StaticResource SecondaryButton}"
+                                IsEnabled="{Binding IsConnected}"
+                                WidthRequest="72" />
+                    </HorizontalStackLayout>
+
+                    <Label Text="{Binding BleToComMatchStatus}"
+                           TextColor="{Binding BleToComMatchColor}"
+                           FontAttributes="Bold" FontSize="12" />
+
+                    <!-- Side-by-side hex dump -->
+                    <Grid ColumnDefinitions="*,1,*" ColumnSpacing="0" HeightRequest="180">
+                        <ScrollView Grid.Column="0">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="Sent" FontAttributes="Bold" FontSize="11"
+                                       TextColor="{StaticResource TextSecondary}" />
+                                <Label Text="{Binding BleToComSentHex}"
+                                       Style="{StaticResource HexDump}" />
+                            </VerticalStackLayout>
+                        </ScrollView>
+                        <BoxView Grid.Column="1" Color="{StaticResource BorderColor}" />
+                        <ScrollView Grid.Column="2">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="Received (COM)" FontAttributes="Bold" FontSize="11"
+                                       TextColor="{StaticResource TextSecondary}" />
+                                <Label Text="{Binding BleToComReceivedHex}"
+                                       Style="{StaticResource HexDump}" />
+                            </VerticalStackLayout>
+                        </ScrollView>
+                    </Grid>
+                </VerticalStackLayout>
+            </Frame>
+
+            <Button Text="Clear Hex Dumps"
+                    Command="{Binding ClearHexDumpsCommand}"
+                    BackgroundColor="{StaticResource BorderColor}"
+                    TextColor="{StaticResource TextPrimary}"
+                    CornerRadius="6" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

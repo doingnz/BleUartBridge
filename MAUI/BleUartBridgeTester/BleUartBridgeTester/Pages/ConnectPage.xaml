@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             xmlns:vm="clr-namespace:BleUartBridgeTester.ViewModels"
+             xmlns:ble="clr-namespace:BPplus.Ble;assembly=BPplus.Ble"
+             x:Class="BleUartBridgeTester.Pages.ConnectPage"
+             Title="Connect"
+             BackgroundColor="{StaticResource PageBackground}">
+
+    <ContentPage.Resources>
+        <toolkit:InvertedBoolConverter x:Key="InvertBool" />
+        <toolkit:BoolToObjectConverter x:Key="BoolToConnectedText"
+            TrueObject="Disconnect" FalseObject="Connect" />
+        <toolkit:BoolToObjectConverter x:Key="BoolToScanText"
+            TrueObject="Stop Scan" FalseObject="Scan" />
+        <toolkit:BoolToObjectConverter x:Key="BoolToConnectedColor"
+            TrueObject="{StaticResource ConnectedColor}"
+            FalseObject="{StaticResource DisconnectedColor}" />
+        <toolkit:BoolToObjectConverter x:Key="BoolToStatusText"
+            TrueObject="Connected and ready"
+            FalseObject="Not connected" />
+    </ContentPage.Resources>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="10">
+
+            <!-- ── BLE Section ── -->
+            <Label Text="Bluetooth" Style="{StaticResource SectionHeader}" />
+
+            <HorizontalStackLayout Spacing="10">
+                <Button Text="{Binding IsScanning, Converter={StaticResource BoolToScanText}}"
+                        Command="{Binding ToggleScanCommand}"
+                        Style="{StaticResource PrimaryButton}"
+                        WidthRequest="120" />
+                <ActivityIndicator IsRunning="{Binding IsScanning}"
+                                   IsVisible="{Binding IsScanning}"
+                                   Color="{StaticResource Primary}"
+                                   VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <!-- BLE device list -->
+            <Frame Style="{StaticResource CardFrame}" HeightRequest="220">
+                <CollectionView ItemsSource="{Binding BleDevices}"
+                                SelectedItem="{Binding SelectedBleDevice}"
+                                SelectionMode="Single">
+                    <CollectionView.EmptyView>
+                        <Label Text="No devices found. Press Scan."
+                               TextColor="{StaticResource TextSecondary}"
+                               HorizontalOptions="Center"
+                               VerticalOptions="Center" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="ble:BleDeviceInfo">
+                            <Grid Padding="4,6" ColumnDefinitions="12,*,Auto">
+                                <BoxView Grid.Column="0"
+                                         WidthRequest="8" HeightRequest="8"
+                                         CornerRadius="4"
+                                         BackgroundColor="{StaticResource Secondary}"
+                                         VerticalOptions="Center" />
+                                <Label Grid.Column="1"
+                                       Text="{Binding DisplayName}"
+                                       TextColor="{StaticResource TextPrimary}"
+                                       FontSize="13"
+                                       VerticalOptions="Center"
+                                       Margin="6,0,0,0" />
+                                <Label Grid.Column="2"
+                                       Text="{Binding Rssi, StringFormat='{0} dBm'}"
+                                       TextColor="{StaticResource TextSecondary}"
+                                       FontSize="11"
+                                       VerticalOptions="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Frame>
+
+            <Label Text="{Binding BleStatus}"
+                   TextColor="{Binding IsBleConnected, Converter={StaticResource BoolToConnectedColor}}"
+                   FontAttributes="Bold" />
+
+            <BoxView HeightRequest="1" Color="{StaticResource BorderColor}" Margin="0,4" />
+
+            <!-- ── COM Section (hidden on Android) ── -->
+            <VerticalStackLayout IsVisible="{Binding IsComAvailable}" Spacing="8">
+                <Label Text="Serial Port" Style="{StaticResource SectionHeader}" />
+
+                <Frame Style="{StaticResource CardFrame}">
+                    <Grid ColumnDefinitions="60,*,Auto" ColumnSpacing="8" RowDefinitions="Auto">
+                        <Label Grid.Column="0" Text="Port:" VerticalOptions="Center"
+                               TextColor="{StaticResource TextSecondary}" />
+                        <Picker Grid.Column="1" Title="Select port..."
+                                ItemsSource="{Binding AvailablePorts}"
+                                SelectedItem="{Binding SelectedPort}"
+                                HorizontalOptions="Fill"
+                                TextColor="{StaticResource TextPrimary}"
+                                TitleColor="{StaticResource TextSecondary}" />
+                        <Button Grid.Column="2" Text="Refresh" Clicked="OnRefreshPortsClicked"
+                                Style="{StaticResource PrimaryButton}" />
+                    </Grid>
+                </Frame>
+
+                <Frame Style="{StaticResource CardFrame}">
+                    <Grid ColumnDefinitions="60,*,20,60,*" RowDefinitions="Auto,Auto,Auto"
+                          ColumnSpacing="8" RowSpacing="8">
+                        <Label Grid.Row="0" Grid.Column="0" Text="Baud:"
+                               VerticalOptions="Center"
+                               TextColor="{StaticResource TextSecondary}" />
+                        <Picker Grid.Row="0" Grid.Column="1" Title="Baud rate"
+                                ItemsSource="{Binding BaudRates}"
+                                SelectedItem="{Binding SelectedBaudRate}"
+                                TextColor="{StaticResource TextPrimary}"
+                                TitleColor="{StaticResource TextSecondary}" />
+
+                        <Label Grid.Row="0" Grid.Column="3" Text="Data:"
+                               VerticalOptions="Center"
+                               TextColor="{StaticResource TextSecondary}" />
+                        <Picker Grid.Row="0" Grid.Column="4" Title="Data bits"
+                                ItemsSource="{Binding DataBitsOptions}"
+                                SelectedItem="{Binding SelectedDataBits}"
+                                TextColor="{StaticResource TextPrimary}"
+                                TitleColor="{StaticResource TextSecondary}" />
+
+                        <Label Grid.Row="1" Grid.Column="0" Text="Parity:"
+                               VerticalOptions="Center"
+                               TextColor="{StaticResource TextSecondary}" />
+                        <Picker Grid.Row="1" Grid.Column="1" Title="Parity"
+                                ItemsSource="{Binding ParityOptions}"
+                                SelectedItem="{Binding SelectedParity}"
+                                TextColor="{StaticResource TextPrimary}"
+                                TitleColor="{StaticResource TextSecondary}" />
+
+                        <Label Grid.Row="1" Grid.Column="3" Text="Stop:"
+                               VerticalOptions="Center"
+                               TextColor="{StaticResource TextSecondary}" />
+                        <Picker Grid.Row="1" Grid.Column="4" Title="Stop bits"
+                                ItemsSource="{Binding StopBitsOptions}"
+                                SelectedItem="{Binding SelectedStopBits}"
+                                TextColor="{StaticResource TextPrimary}"
+                                TitleColor="{StaticResource TextSecondary}" />
+
+                        <HorizontalStackLayout Grid.Row="2" Grid.ColumnSpan="5" Spacing="10">
+                            <CheckBox IsChecked="{Binding FlowControlEnabled}"
+                                      Color="{StaticResource Primary}"
+                                      VerticalOptions="Center" />
+                            <Label Text="Flow Control (RTS/CTS)"
+                                   VerticalOptions="Center"
+                                   TextColor="{StaticResource TextSecondary}" />
+                        </HorizontalStackLayout>
+                    </Grid>
+                </Frame>
+
+                <Label Text="{Binding ComStatus}"
+                       TextColor="{Binding IsComConnected,
+                           Converter={StaticResource BoolToConnectedColor}}"
+                       FontAttributes="Bold" />
+            </VerticalStackLayout>
+
+            <Label Text="Serial port not available on Android."
+                   IsVisible="{Binding IsComAvailable, Converter={StaticResource InvertBool}}"
+                   TextColor="{StaticResource TextSecondary}"
+                   FontSize="12" />
+
+            <BoxView HeightRequest="1" Color="{StaticResource BorderColor}" Margin="0,4" />
+
+            <!-- ── Connect / Disconnect ── -->
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                <Button Grid.Column="0"
+                        Text="Connect"
+                        Command="{Binding ConnectCommand}"
+                        Style="{StaticResource SecondaryButton}"
+                        IsVisible="{Binding IsConnected, Converter={StaticResource InvertBool}}" />
+                <Button Grid.Column="1"
+                        Text="Disconnect"
+                        Command="{Binding DisconnectCommand}"
+                        Style="{StaticResource DangerButton}"
+                        IsVisible="{Binding IsConnected}" />
+            </Grid>
+
+            <!-- Overall status -->
+            <Frame Style="{StaticResource CardFrame}">
+                <HorizontalStackLayout Spacing="8">
+                    <BoxView WidthRequest="12" HeightRequest="12" CornerRadius="6"
+                             BackgroundColor="{Binding IsConnected,
+                                 Converter={StaticResource BoolToConnectedColor}}"
+                             VerticalOptions="Center" />
+                    <Label Text="{Binding IsConnected,
+                               Converter={StaticResource BoolToStatusText}}"
+                           FontAttributes="Bold"
+                           TextColor="{Binding IsConnected,
+                               Converter={StaticResource BoolToConnectedColor}}"
+                           VerticalOptions="Center" />
+                </HorizontalStackLayout>
+            </Frame>
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

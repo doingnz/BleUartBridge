@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:pages="clr-namespace:BleUartBridgeTester.Pages"
+       x:Class="BleUartBridgeTester.AppShell"
+       Title="BLE UART Bridge Tester">
+
+    <TabBar>
+        <ShellContent Title="Connect"
+                      ContentTemplate="{DataTemplate pages:ConnectPage}" />
+        <ShellContent Title="Manual"
+                      ContentTemplate="{DataTemplate pages:ManualPage}" />
+        <ShellContent Title="Test"
+                      ContentTemplate="{DataTemplate pages:TestPage}" />
+    </TabBar>
+
+</Shell>
