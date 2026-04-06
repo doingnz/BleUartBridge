@@ -108,7 +108,9 @@ On the ESP32-S3 the LED is a WS2812 RGB pixel (GPIO48). On the ESP32 it is a sin
 | PDU | Contents |
 |-----|----------|
 | ADV PDU | Flags + NUS 128-bit service UUID |
-| Scan response | Complete local name `"BP+ Bridge"` |
+| Scan response | Complete local name `"BP+ Bridge XXXX"` |
+
+The device name includes the last 4 hex digits of the BLE MAC address (e.g. `"BP+ Bridge 96EE"`) so multiple bridges can be distinguished during scanning. The MAC suffix matches the address shown in BLE scanner apps.
 
 The service UUID is in the ADV PDU (not the scan response) for reliable discovery via the Web Bluetooth API on Chrome/Windows, which may not process scan responses before the `requestDevice()` picker appears.
 
@@ -132,6 +134,8 @@ Preferred ATT MTU is 512 bytes. The client negotiates the actual MTU; the ESP32 
 ### BLE → UART (CTS direction)
 
 `on_ble_write()` runs on the NimBLE host task. It posts received data to a FreeRTOS queue and returns immediately. A dedicated `uart_tx_task` dequeues items and calls `uart_write_bytes()`. When the device deasserts CTS, `uart_write_bytes()` blocks inside `uart_tx_task` — this is harmless because `uart_tx_task` is not the BLE host task, so NimBLE continues processing events normally.
+
+If the queue is full (CTS held off long enough to exhaust all 32 slots), `on_ble_write()` returns a non-zero value. `nus_rx_chr_cb` translates this into an ATT Error Response (`ATT_ERR_INSUFFICIENT_RES`), which causes clients using `writeValueWithResponse` to receive a rejection and retry. This provides true end-to-end backpressure rather than silent data loss.
 
 ### UART → BLE (RTS direction)
 
