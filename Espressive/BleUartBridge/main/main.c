@@ -37,6 +37,7 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "esp_heap_caps.h"
+#include "esp_mac.h"
 
 // ── Board pin assignments ─────────────────────────────────────────────────────
 // TX_PIN, RX_PIN, RTS_PIN, CTS_PIN, LED_PIN are defined in the board header.
@@ -66,7 +67,7 @@ static const char *TAG = "BRIDGE";
 #define UART_BAUD       115200
 #define UART_RX_BUF     4096    // UART driver RX ring buffer
 
-#define BLE_DEVICE_NAME "BP+ Bridge"
+#define BLE_DEVICE_NAME_PREFIX "BP+ Bridge"
 #define BLE_MTU         512
 #define BLE_CHUNK       128     // max bytes per BLE notification
 
@@ -202,24 +203,28 @@ static void hex_dump(const char *dir, const uint8_t *data, size_t len)
 // process HCI events (including mbuf recycling for sent notifications).
 // uart_tx_task performs the blocking uart_write_bytes on core 1.
 
-static void on_ble_write(const uint8_t *data, size_t len)
+// Returns 0 if data was queued, 1 if the queue is full.
+// A non-zero return causes nus_rx_chr_cb to send an ATT Error Response so that
+// clients using writeValueWithResponse (ATT Write Request) receive the rejection
+// and can retry.  The caller (uart_tx_task) will drain the queue as fast as
+// hardware CTS flow control allows; the client should retry after a short delay.
+static int on_ble_write(const uint8_t *data, size_t len)
 {
     hex_dump("BLE→UART", data, len);
 
-    if (len == 0 || len > TX_MAX_LEN) return;
+    if (len == 0 || len > TX_MAX_LEN) return 0;  // ignore empty / oversized
 
     tx_item_t item;
     item.len = (uint16_t)len;
     memcpy(item.data, data, len);
 
-    // Non-blocking post — if the queue is full the UART TX task is backed up
-    // (CTS held off).  Drop and warn; RTS on the UART side will already be
-    // asserting to slow the sender.
     if (xQueueSend(s_uart_tx_q, &item, 0) != pdTRUE) {
-        bytes_dropped_tx += len;
-        ESP_LOGW(TAG, "BLE→UART: TX queue full — dropped %u bytes (total dropped: %lu)",
-                 (unsigned)len, bytes_dropped_tx);
+        // Queue full — signal the ATT layer to reject this write so the client
+        // can retry once the queue has drained (CTS-driven backpressure).
+        bytes_dropped_tx += len;   // track bytes rejected (may be retried by client)
+        return 1;
     }
+    return 0;
 }
 
 // ── UART TX task: drains s_uart_tx_q → UART1 ─────────────────────────────────
@@ -351,7 +356,7 @@ static void print_status(void)
     ESP_LOGI(TAG, " NimBLE log : %s", nimble_log_verbose ? "VERBOSE" : "quiet");
     ESP_LOGI(TAG, " →UART      : %lu bytes", bytes_to_uart);
     ESP_LOGI(TAG, " ←UART      : %lu bytes", bytes_from_uart);
-    ESP_LOGI(TAG, " TX dropped : %lu bytes  (BLE→UART queue-full)", bytes_dropped_tx);
+    ESP_LOGI(TAG, " TX rejected: %lu bytes  (BLE→UART queue-full; ATT error sent, client retries)", bytes_dropped_tx);
     ESP_LOGI(TAG, " NOMEM retry: %lu total  (last episode: %lu ms)", nomem_retries_total, nomem_last_ms);
     ESP_LOGI(TAG, " UART hwBuf : %u bytes", (unsigned)hw_buf);
     ESP_LOGI(TAG, " TX q depth : %u / %d",
@@ -372,20 +377,30 @@ void app_main(void)
     const char *board = "ESP32 DevKit";
 #endif
 
+    // Build a unique device name from the last 4 hex digits of the BLE MAC
+    // address so multiple bridges are distinguishable during BLE scanning.
+    // esp_read_mac(ESP_MAC_BT) returns the same address shown in the
+    // advertising log and in scanner apps.
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_BT);
+    char ble_device_name[32];
+    snprintf(ble_device_name, sizeof(ble_device_name),
+             "%s %02X%02X", BLE_DEVICE_NAME_PREFIX, mac[4], mac[5]);
+
     ESP_LOGI(TAG, "================================");
     ESP_LOGI(TAG, "  BLE UART Bridge  —  %s", board);
     ESP_LOGI(TAG, "================================");
     ESP_LOGI(TAG, " UART : TX=%d  RX=%d  RTS=%d  CTS=%d  %d baud",
              TX_PIN, RX_PIN, RTS_PIN, CTS_PIN, UART_BAUD);
     ESP_LOGI(TAG, " BLE  : '%s'  MTU=%d  chunk=%d",
-             BLE_DEVICE_NAME, BLE_MTU, BLE_CHUNK);
+             ble_device_name, BLE_MTU, BLE_CHUNK);
 #if CONFIG_IDF_TARGET_ESP32S3
     ESP_LOGI(TAG, " LED  : GPIO%d (WS2812) — blink=advertising  steady=connected", LED_PIN);
 #else
     ESP_LOGI(TAG, " LED  : GPIO%d — blink=advertising  steady=connected", LED_PIN);
 #endif
     ESP_LOGI(TAG, " Dump : OFF  (send 'h' to toggle)");
-    ESP_LOGI(TAG, " Commands: h=hex dump  n=NimBLE log  s=status");
+    ESP_LOGI(TAG, " Commands: h=hex dump  n=NimBLE log  s=status  c=clear stats");
 
     // Suppress NimBLE host INFO logs by default — they fire on every notify()
     // call and flood the console during active data transfer.
@@ -397,7 +412,7 @@ void app_main(void)
     assert(s_uart_tx_q != NULL);
 
     uart_init();
-    nus_init(BLE_DEVICE_NAME, on_ble_write);
+    nus_init(ble_device_name, on_ble_write);
 
     // BLE→UART task: drains TX queue to UART1 (blocking writes stay off host task)
     xTaskCreatePinnedToCore(uart_tx_task, "uart_tx",
@@ -435,6 +450,15 @@ void app_main(void)
             break;
         case 's': case 'S':
             print_status();
+            break;
+        case 'c': case 'C':
+            bytes_to_uart        = 0;
+            bytes_from_uart      = 0;
+            bytes_dropped_tx     = 0;
+            nomem_retries_total  = 0;
+            nomem_last_ms        = 0;
+            nus_reset_disconnect_count();
+            ESP_LOGI(TAG, "[CMD] Stats cleared");
             break;
         default:
             break;

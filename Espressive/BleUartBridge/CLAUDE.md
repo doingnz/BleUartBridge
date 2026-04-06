@@ -47,6 +47,7 @@ Console commands in the monitor:
 | `h` | Toggle hex dump (logs both directions with offset, hex, ASCII) |
 | `n` | Toggle NimBLE verbose logging (suppressed by default) |
 | `s` | Print status: BLE state, disconnect count, byte counters, TX queue depth, heap |
+| `c` | Clear stats: resets byte counters, dropped bytes, NOMEM retries, disconnect count |
 
 ## File structure
 

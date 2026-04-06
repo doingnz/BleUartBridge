@@ -21,7 +21,15 @@
  *                     to the RX characteristic.  Must not block for long.
  *                     Signature: void cb(const uint8_t *data, size_t len)
  */
-typedef void (*nus_write_cb_t)(const uint8_t *data, size_t len);
+/**
+ * Callback invoked (on the NimBLE host task) when the client writes to the
+ * NUS RX characteristic.  Return 0 if the data was accepted, non-zero if it
+ * could not be accepted (e.g. internal queue full).  A non-zero return causes
+ * NimBLE to send an ATT Error Response so that clients using
+ * writeValueWithResponse can retry the write; clients using
+ * writeValueWithoutResponse cannot be notified of the rejection.
+ */
+typedef int (*nus_write_cb_t)(const uint8_t *data, size_t len);
 
 void nus_init(const char *device_name, nus_write_cb_t write_cb);
 
@@ -30,6 +38,9 @@ bool nus_is_connected(void);
 
 /** Returns total number of disconnections since boot. */
 unsigned long nus_disconnect_count(void);
+
+/** Resets the disconnection counter to zero. */
+void nus_reset_disconnect_count(void);
 
 /** nus_notify return codes */
 #define NUS_ERR_NOMEM  (-1)   /**< mbuf pool exhausted — retryable              */

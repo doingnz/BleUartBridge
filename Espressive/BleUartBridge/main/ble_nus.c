@@ -89,8 +89,12 @@ static int nus_rx_chr_cb(uint16_t conn_handle, uint16_t attr_handle,
         return BLE_ATT_ERR_UNLIKELY;
     }
 
-    s_write_cb(buf, pkt_len);
-    return 0;
+    // Propagate the callback's return value as an ATT error so that clients
+    // using writeValueWithResponse receive an ATT Error Response and can retry.
+    // NimBLE ignores non-zero returns for Write Command (no-response) writes,
+    // so this only helps clients that use Write Request semantics.
+    int write_rc = s_write_cb(buf, pkt_len);
+    return write_rc ? BLE_ATT_ERR_INSUFFICIENT_RES : 0;
 }
 
 /**
@@ -345,6 +349,11 @@ bool nus_is_connected(void)
 unsigned long nus_disconnect_count(void)
 {
     return s_disconnect_count;
+}
+
+void nus_reset_disconnect_count(void)
+{
+    s_disconnect_count = 0;
 }
 
 // Return values:

@@ -90,6 +90,7 @@ The firmware exposes an interactive console on the monitor port.
 | `h` | Toggle hex dump — logs every bridged byte in both directions with offset, hex, and ASCII columns |
 | `n` | Toggle NimBLE verbose logging — suppressed by default because it logs on every notification |
 | `s` | Print status: BLE state, disconnect count, byte counters, TX queue depth, heap free / minimum |
+| `c` | Clear statistics — resets byte counters, dropped-byte count, NOMEM retry total, and disconnect count |
 
 ## LED status
 

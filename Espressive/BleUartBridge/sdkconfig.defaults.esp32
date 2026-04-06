@@ -7,9 +7,20 @@ CONFIG_ESPTOOLPY_FLASHSIZE="8MB"
 
 # ── Console ───────────────────────────────────────────────────────────────────
 # Classic ESP32 has no native USB — console via UART0 (CH340/CP2102 USB-UART chip)
-CONFIG_ESP_CONSOLE_UART_DEFAULT=y
-# 921600 baud keeps hex dump output ahead of BLE write traffic (128 B chunk →
-# ~480 chars output → ~5 ms at 921600 vs ~42 ms at 115200; BLE writes arrive
-# every ~20 ms, so 115200 causes FIFO saturation and uart_tx_char busy-waits).
-# idf.py monitor reads this value automatically — no extra flag needed.
-CONFIG_ESP_CONSOLE_UART_BAUDRATE=921600
+#
+# In IDF v6.0 (esp_stdio component), CONFIG_ESP_CONSOLE_UART_BAUDRATE has the
+# prompt "if ESP_CONSOLE_UART_CUSTOM" — the baud rate is only user-configurable
+# when CUSTOM is selected; with DEFAULT selected it is locked to 115200 and
+# sdkconfig.defaults overrides are silently ignored.  Using CUSTOM with NUM=0
+# keeps console on UART0 while allowing the baud rate to be changed.
+#
+# 460800 baud keeps hex dump output ahead of BLE write traffic (128 B chunk
+# becomes ~480 chars of output; at 115200 that is ~42 ms per write but BLE
+# writes arrive every ~20 ms, saturating the FIFO and causing uart_tx_char to
+# busy-wait indefinitely, which starves the task watchdog).  921600 is within
+# the CH340G spec but the baud-rate divisor error (~3%) sits at the UART
+# tolerance limit and causes silent fallback to 115200 on some boards/drivers;
+# 460800 has <1% error and is reliable on all CH340 variants.
+CONFIG_ESP_CONSOLE_UART_CUSTOM=y
+CONFIG_ESP_CONSOLE_UART_NUM=0
+CONFIG_ESP_CONSOLE_UART_BAUDRATE=460800
