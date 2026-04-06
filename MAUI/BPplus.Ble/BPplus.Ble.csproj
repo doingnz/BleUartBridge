@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0;net10.0-windows10.0.19041.0;net10.0-android;net10.0-maccatalyst</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>BPplus.Ble</RootNamespace>
+    <AssemblyName>BPplus.Ble</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Plugin.BLE" Version="3.2.0" />
+    <PackageReference Include="System.IO.Pipelines" Version="10.0.5" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\BPplus.Serial\BPplus.Serial.csproj" />
+  </ItemGroup>
+</Project>

@@ -44,10 +44,10 @@
   <ItemGroup Condition="!$(TargetFramework.Contains('-android'))">
     <PackageReference Include="System.IO.Ports" Version="*" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BPplus.Ble\BPplus.Ble.csproj" />
+  </ItemGroup>
 
   <!-- BPplus.Ble project reference (provides BleScanner, BleProfileDetector, UUIDs) -->
-  <ItemGroup>
-    <ProjectReference Include="..\..\BPplusMeasurement\BPplus.Ble\BPplus.Ble.csproj" />
-  </ItemGroup>
 
 </Project>

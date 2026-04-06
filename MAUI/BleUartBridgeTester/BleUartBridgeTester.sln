@@ -5,7 +5,7 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BleUartBridgeTester", "BleUartBridgeTester\BleUartBridgeTester.csproj", "{58E0FEEC-353F-4534-A1B4-2287A4B93D58}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BPplus.Ble", "..\BPplusMeasurement\BPplus.Ble\BPplus.Ble.csproj", "{05907AA5-18E7-4649-ABE4-DCD0C6A947B4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BPplus.Ble", "..\BPplus.Ble\BPplus.Ble.csproj", "{05907AA5-18E7-4649-ABE4-DCD0C6A947B4}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BPplus.Serial", "..\BPplus.Serial\BPplus.Serial.csproj", "{99375164-75A1-4B55-A91F-768F8F0E1926}"
 EndProject
